@@ -150,8 +150,6 @@ buck_local_bundle(
     info_plist = "Info.plist",
     info_plist_substitutions = info_plist_substitutions("ExampleApp"),
     native_xcode_deps=prebuilt_frameworks + [
-        # For "#watch", https://buckbuild.com/rule/apple_bundle.html#deps
-        ":ExampleWatchApp#watch",
         ":ExampleMessageExtension"
     ],
     buck_local_deps=prebuilt_frameworks,
@@ -161,89 +159,6 @@ apple_package(
     name = "ExampleAppPackage",
     bundle = ":ExampleApp",
 )
-
-### Watch App Begin ###
-# Define the watch app in the same BUCK file as the binary into which the watch app will be installed.
-# Xcode is finicky when it comes to how it embeds watch apps into main app bundles.  Watch apps are
-# built into the `watchos` build directory, but Xcode only knows to look for the watch app binary in the `watchos`
-# directory if the watch target is defined in the same `pbxproj` as the main app binary. If the key/value pair
-# on the watch target `SDKROOT = watchos;` is not in the same `pbxproj` as the target that defines the main app
-# binary, the Copy Files phase to embed the watch app and extension will search the `iphoneos` directory,
-# and fail the build on generated Xcode projects.
-
-# This is the code that runs on the iPhone and talks to the app running on the Watch.
-apple_binary(
-    name = "ExampleWatchAppExtensionBinary",
-    srcs = glob([
-        "WatchExtension/**/*.swift",
-    ]),
-    # Without specifying the target, buck will provide a wrong one,
-    # which will cause compiler error.
-    swift_compiler_flags = ["-target", "i386-apple-watchos4.0-simulator"],
-    configs = watch_binary_configs("ExampleApp.WatchApp.Extension"),
-    linker_flags = ["-e", "_WKExtensionMain"],
-    frameworks = [
-        "$SDKROOT/System/Library/Frameworks/CoreGraphics.framework",
-        "$SDKROOT/System/Library/Frameworks/Foundation.framework",
-        "$SDKROOT/System/Library/Frameworks/UIKit.framework",
-        "$SDKROOT/System/Library/Frameworks/WatchConnectivity.framework",
-        "$SDKROOT/System/Library/Frameworks/WatchKit.framework",
-    ],
-    headers = glob([
-        "WatchExtension/**/*.h",
-    ]),
-)
-
-apple_bundle(
-    name = "ExampleWatchAppExtension",
-    binary = ":ExampleWatchAppExtensionBinary",
-    extension = "appex",
-    info_plist = "WatchExtension/Info.plist",
-    info_plist_substitutions = {
-        "DEVELOPMENT_LANGUAGE": DEVELOPMENT_LANGUAGE,
-        "EXECUTABLE_NAME": "ExampleWatchAppExtension",
-        "PRODUCT_BUNDLE_IDENTIFIER": bundle_identifier("ExampleApp.WatchApp.Extension"),
-        "WK_APP_BUNDLE_IDENTIFIER": bundle_identifier("ExampleApp.WatchApp"),
-        "PRODUCT_NAME": "ExampleWatchAppExtension",
-        "PRODUCT_MODULE_NAME": "ExampleWatchAppExtensionBinary",
-    },
-    xcode_product_type = "com.apple.product-type.watchkit2-extension",
-)
-
-# This is the code that runs on the Watch.
-apple_binary(
-    name = "ExampleWatchAppBinary",
-    configs = watch_binary_configs("ExampleApp.WatchApp")
-)
-
-apple_bundle(
-    name = "ExampleWatchApp",
-    binary = ":ExampleWatchAppBinary",
-    visibility = [
-        "//App:",
-    ],
-    extension = "app",
-    info_plist = "WatchApplication/Info.plist",
-    info_plist_substitutions = {
-        "DEVELOPMENT_LANGUAGE": DEVELOPMENT_LANGUAGE,
-        "EXECUTABLE_NAME": "ExampleWatchApp",
-        "PRODUCT_BUNDLE_IDENTIFIER": bundle_identifier("ExampleApp.WatchApp"),
-        "WK_COMPANION_APP_BUNDLE_IDENTIFIER": bundle_identifier("ExampleApp"),
-        "PRODUCT_NAME": "ExampleWatchApp",
-    },
-    xcode_product_type = "com.apple.product-type.application.watchapp2",
-    deps = [
-        ":ExampleWatchAppExtension",
-        ":ExampleWatchAppResources",
-    ],
-)
-
-apple_resource(
-    name = "ExampleWatchAppResources",
-    dirs = [],
-    files = glob(["WatchApplication/**/*.storyboard"])
-)
-### Watch App End ###
 
 ### iMessage Extension Begin ###
 # It is possible for an iMessage extension to be declared in a separate BUCK file.
