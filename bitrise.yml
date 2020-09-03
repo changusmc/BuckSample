@@ -1,0 +1,52 @@
+---
+format_version: '8'
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+project_type: other
+trigger_map:
+- push_branch: "*"
+  workflow: primary
+- pull_request_source_branch: "*"
+  workflow: primary
+workflows:
+  primary:
+    steps:
+    - activate-ssh-key@4:
+        run_if: '{{getenv "SSH_RSA_PRIVATE_KEY" | ne ""}}'
+    - git-clone@4: {}
+    - script@1:
+        title: Install Buck
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            # fail if any commands fails
+            set -e
+            # debug log
+            set -x
+
+            make install_buck
+    - script@1:
+        title: Make Project
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            # fail if any commands fails
+            set -e
+            # debug log
+            set -x
+
+            make project
+            envman add --key BITRISE_PROJECT_PATH --value App/ExampleApp.xcworkspace
+            envman add --key BITRISE_SCHEME --value ExampleApp
+    - xcode-test@2:
+        inputs:
+        - simulator_os_version: "${SIMULATOR_OS_VERSION}"
+        - simulator_device: "${SIMULATOR_DEVICE}"
+    - deploy-to-bitrise-io@1: {}
+app:
+  envs:
+  - opts:
+      is_expand: false
+    SIMULATOR_DEVICE: iPhone 11 Pro
+  - opts:
+      is_expand: false
+    SIMULATOR_OS_VERSION: latest
